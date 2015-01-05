@@ -1,8 +1,16 @@
 package main
 
+import (
+	"fmt"
+	"os"
+	"unsafe"
+)
+
+
 /*
 #include <dirent.h>
 #include <stdlib.h>
+
 #include "walk.h"
 
 extern void printNode(const char *, struct dirent *);
@@ -14,12 +22,6 @@ void doWalkNode(const char *path, struct dirent *node) {
 }
 */
 import "C"
-
-import (
-	"fmt"
-	"os"
-	"unsafe"
-)
 
 func main() {
 	paths := os.Args[1:]
@@ -39,17 +41,6 @@ func Walk(paths []string, node Node, fn NodeFn) {
 	for _, p := range paths {
 		cpath := C.CString(p)
 		defer C.free(unsafe.Pointer(cpath))
-
-		// 		// Wrap our client call back
-		// 		callback := func(p *C.char, dirent *C.struct_dirent) {
-		// 			// Convert back to Go
-		// 			node := MakeNodeFromDirent(dirent)
-		// 			path := C.GoString(p)
-		//
-		// 			// Call client
-		// 			fn(path, node)
-		// 		}
-
 		// C.WalkNode(cpath, nil, (*C.func_CallBack)(unsafe.Pointer(&callback)))
 		// C.WalkNode(cpath, nil, *(**[0]byte)(unsafe.Pointer(&callback)))
 		C.doWalkNode(cpath, nil)

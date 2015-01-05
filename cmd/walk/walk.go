@@ -16,6 +16,7 @@ import (
 extern int NodeCounter;
 extern int DirCounter;
 
+// Forward declaration (defined in cfuncs.go)
 extern void myPrint(char *p, struct dirent *de);
 */
 import "C"
@@ -27,14 +28,14 @@ func main() {
 		paths = []string{"."}
 	}
 
-	Walk(paths, nil, printNode)
+	Walk(paths, nil)
 	// Print stats
 	fmt.Fprintf(os.Stderr, "\nTotal: %d nodes, %d directories, %d otheres\n",
 		int(C.NodeCounter), int(C.DirCounter), int(C.NodeCounter)-int(C.DirCounter),
 	)
 }
 
-func Walk(paths []string, node Node, fn NodeFn) {
+func Walk(paths []string, node Node) {
 	for _, p := range paths {
 		cpath := C.CString(p)
 		defer C.free(unsafe.Pointer(cpath))
@@ -43,7 +44,7 @@ func Walk(paths []string, node Node, fn NodeFn) {
 	}
 }
 
-func MakeNodeFromDirent(dirent *C.struct_dirent) Node {
+func makeNode(dirent *C.struct_dirent) Node {
 	node := &node_t{}
 
 	node.name = C.GoString((*C.char)(&dirent.d_name[0]))
@@ -69,8 +70,6 @@ func MakeNodeFromDirent(dirent *C.struct_dirent) Node {
 
 	return node
 }
-
-type NodeFn func(path *C.char, node *C.struct_dirent)
 
 type NodeType uint8
 
@@ -127,7 +126,7 @@ func (n node_t) Type() NodeType {
 //export printNode
 func printNode(p *C.char, de *C.struct_dirent) {
 	path := C.GoString(p)
-	node := MakeNodeFromDirent(de)
+	node := makeNode(de)
 	fmt.Printf("[%s] %s\n", node.Type(), path)
 }
 

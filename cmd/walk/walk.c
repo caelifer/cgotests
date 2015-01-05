@@ -14,7 +14,7 @@
 #include "_cgo_export.h"
 
 #ifndef NAME_MAX
-#define NAME_MAX 256
+#define NAME_MAX 1024
 #endif
 
 static struct dirent *createNode(const char *path);
@@ -50,7 +50,7 @@ void WalkTree(const char *path, DIR *dir, CallBack cb) {
 		// Finally build new path
 		sprintf(newPath, "%s/%s", strcmp(path, "/") == 0 ? "" : path, node.d_name);
 
-		// Walk each node
+		// Walk each node (recursively)
 		WalkNode(newPath, &node, cb);
 
 		// Make sure to free allocated newPath
@@ -89,6 +89,8 @@ void WalkNode(const char *path, struct dirent *node, CallBack cb) {
 	// Check if node is directory and call WalkTree on it
 	if (node->d_type == DT_DIR) {
 
+		DirCounter++; // Increment directory count
+
 		DIR *dir = opendir(path);
 
 		if (dir == NULL) {
@@ -97,12 +99,11 @@ void WalkNode(const char *path, struct dirent *node, CallBack cb) {
 			return;
 		}
 
+		// Recurse via WalkTree call
 		WalkTree(path, dir, cb);
 
 		// Always close open directory
 		closedir(dir);
-
-		DirCounter++; // Increment directory count
 	}
 
 	if (needFree) {
@@ -110,11 +111,12 @@ void WalkNode(const char *path, struct dirent *node, CallBack cb) {
 	}
 }
 
+// Simple function to check if names are '.' or '..'
 static int dots(const char *name) {
 	return strncmp(name, "..", NAME_MAX) == 0 || strncmp(name, ".", NAME_MAX) == 0;
-	// return strncmp(name, "..", NAME_MAX) == 0;
 }
 
+// Dirent node constructor
 static struct dirent *createNode(const char *path) {
 		struct dirent *node;
 		struct stat buf;
@@ -161,13 +163,7 @@ static struct dirent *createNode(const char *path) {
 		return node;
 }
 
-// Disable main compiliation
-// Our implimentation of CallBack
-// void printNode(const char *path, struct dirent *node) {
-// 	char *type = node->d_type == DT_DIR ? "DIR" : "OTH";
-// 	printf("[%s] %s\n", type, path);
-// }
-
+// Disable main compiliation when building as a library
 #ifdef TTT_XXX_TTT
 int main(int argc, char *argv[]) {
 	if (argc == 1) {

@@ -11,6 +11,7 @@
 #include <err.h>
 
 #include "walk.h"
+#include "_cgo_export.h"
 
 #ifndef NAME_MAX
 #define NAME_MAX 256
@@ -162,10 +163,10 @@ static struct dirent *createNode(const char *path) {
 
 // Disable main compiliation
 // Our implimentation of CallBack
-void printNode(const char *path, struct dirent *node) {
-	char *type = node->d_type == DT_DIR ? "DIR" : "OTH";
-	printf("[%s] %s\n", type, path);
-}
+// void printNode(const char *path, struct dirent *node) {
+// 	char *type = node->d_type == DT_DIR ? "DIR" : "OTH";
+// 	printf("[%s] %s\n", type, path);
+// }
 
 #ifdef TTT_XXX_TTT
 int main(int argc, char *argv[]) {

@@ -13,13 +13,10 @@ import (
 
 #include "walk.h"
 
-extern void printNode(const char *, struct dirent *);
 extern int NodeCounter;
 extern int DirCounter;
 
-void doWalkNode(const char *path, struct dirent *node) {
-	WalkNode(path, node, printNode);
-}
+extern void myPrint(char *p, struct dirent *de);
 */
 import "C"
 
@@ -30,7 +27,7 @@ func main() {
 		paths = []string{"."}
 	}
 
-	Walk(paths, nil, nil)
+	Walk(paths, nil, printNode)
 	// Print stats
 	fmt.Fprintf(os.Stderr, "\nTotal: %d nodes, %d directories, %d otheres\n",
 		int(C.NodeCounter), int(C.DirCounter), int(C.NodeCounter)-int(C.DirCounter),
@@ -41,9 +38,8 @@ func Walk(paths []string, node Node, fn NodeFn) {
 	for _, p := range paths {
 		cpath := C.CString(p)
 		defer C.free(unsafe.Pointer(cpath))
-		// C.WalkNode(cpath, nil, (*C.func_CallBack)(unsafe.Pointer(&callback)))
-		// C.WalkNode(cpath, nil, *(**[0]byte)(unsafe.Pointer(&callback)))
-		C.doWalkNode(cpath, nil)
+
+		C.WalkNode(cpath, nil, (C.CallBack)(unsafe.Pointer(C.myPrint)))
 	}
 }
 
@@ -74,7 +70,7 @@ func MakeNodeFromDirent(dirent *C.struct_dirent) Node {
 	return node
 }
 
-type NodeFn func(path string, node Node)
+type NodeFn func(path *C.char, node *C.struct_dirent)
 
 type NodeType uint8
 
@@ -128,6 +124,10 @@ func (n node_t) Type() NodeType {
 	return n.kind
 }
 
-// func printNode(path string, node Node) {
-// 	fmt.Printf("[%s] %s\n", node.Type(), path)
-// }
+//export printNode
+func printNode(p *C.char, de *C.struct_dirent) {
+	path := C.GoString(p)
+	node := MakeNodeFromDirent(de)
+	fmt.Printf("[%s] %s\n", node.Type(), path)
+}
+

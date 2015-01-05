@@ -13,7 +13,7 @@ void WalkTree(const char* path, DIR *dir, CallBack cb);
 
 void WalkNode(const char *path, struct dirent *node, CallBack cb);
 
-void printNode(const char *path, struct dirent *node);
+// void printNode(const char *path, struct dirent *node);
 
 
 #endif /* _FIND_H */

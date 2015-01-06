@@ -166,10 +166,11 @@ static struct dirent *createNode(const char *path) {
 void printNode(const char *p, struct dirent *de);
 
 int main(int argc, char *argv[]) {
+	int i;
+
 	if (argc == 1) {
 		WalkNode(".", NULL, printNode);
 	} else {
-		int i;
 		for (i = argc - 1; i > 0; i--) {
 			WalkNode(*(++argv), NULL, printNode);
 		}

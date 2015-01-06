@@ -1,5 +1,4 @@
 #include <dirent.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +10,6 @@
 #include <err.h>
 
 #include "walk.h"
-#include "_cgo_export.h"
 
 #ifndef NAME_MAX
 #define NAME_MAX 1024
@@ -165,6 +163,8 @@ static struct dirent *createNode(const char *path) {
 
 // Disable main compiliation when building as a library
 #ifdef XXX_MAIN_ENABLED_XXX
+void printNode(const char *p, struct dirent *de);
+
 int main(int argc, char *argv[]) {
 	if (argc == 1) {
 		WalkNode(".", NULL, printNode);
@@ -177,4 +177,31 @@ int main(int argc, char *argv[]) {
 
 	fprintf(stderr, "\nTotal: %d nodes, %d directories, %d otheres\n", NodeCounter, DirCounter, NodeCounter - DirCounter);
 }
+
+/* CallBack implementation */ 
+void printNode(const char *path, struct dirent *de) {
+	char *type;
+
+	switch (de->d_type) {
+		case DT_REG:
+			type = "REG"; break;
+		case DT_DIR:
+			type = "DIR"; break;
+		case DT_CHR:
+			type = "CHR"; break;
+		case DT_BLK:
+			type = "BLK"; break;
+		case DT_FIFO:
+			type = "FIO"; break;
+		case DT_LNK:
+			type = "LNK"; break;
+		case DT_SOCK:
+			type = "SCK"; break;
+		default:
+			type = "UNK";
+	}
+
+	printf("[%s] %s\n", type, path);
+}
+
 #endif /* XXX_MAIN_ENABLED_XXX */

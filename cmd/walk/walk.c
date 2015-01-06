@@ -164,7 +164,7 @@ static struct dirent *createNode(const char *path) {
 }
 
 // Disable main compiliation when building as a library
-#ifdef TTT_XXX_TTT
+#ifdef XXX_MAIN_ENABLED_XXX
 int main(int argc, char *argv[]) {
 	if (argc == 1) {
 		WalkNode(".", NULL, printNode);
@@ -177,4 +177,4 @@ int main(int argc, char *argv[]) {
 
 	fprintf(stderr, "\nTotal: %d nodes, %d directories, %d otheres\n", NodeCounter, DirCounter, NodeCounter - DirCounter);
 }
-#endif
+#endif /* XXX_MAIN_ENABLED_XXX */

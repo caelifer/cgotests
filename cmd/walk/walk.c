@@ -24,10 +24,26 @@ int DirCounter = 0;
 // Forward declaration
 static struct dirent *createNode(const char *path);
 static int dots(const char *name);
+static char *createNewPath(const char *oldp, char *newp);
 
 /*
 * Implementation
 */
+
+static char *createNewPath(const char *oldp, char *newp) {
+	// Construct path
+	int sz = strlen(oldp) + strlen(newp) + 2; // +2 for last '0' and middle '/'
+	char *newPath = malloc(sizeof(char) * sz);
+
+	if (newPath == NULL) {
+		perror("memory [WT]");
+		return NULL;
+	}
+
+	// Finally build new path
+	sprintf(newPath, "%s/%s", strcmp(oldp, "/") == 0 ? "" : oldp, newp);
+	return newPath;
+}
 
 // WalkTree
 void WalkTree(const char *path, DIR *dir, CallBack cb) {
@@ -40,17 +56,8 @@ void WalkTree(const char *path, DIR *dir, CallBack cb) {
 			continue;
 		}
 
-		// Construct path
-		int sz = strlen(path) + strlen(node.d_name) + 2; // +2 for last '0' and middle '/'
-
-		char *newPath = malloc(sizeof(char) * sz);
-		if (newPath == NULL) {
-			perror("memory [WT]");
-			return;
-		}
-
-		// Finally build new path
-		sprintf(newPath, "%s/%s", strcmp(path, "/") == 0 ? "" : path, node.d_name);
+        // Build new path
+		char *newPath = createNewPath(path, node.d_name);
 
 		// Walk each node (recursively)
 		WalkNode(newPath, &node, cb);
@@ -75,7 +82,8 @@ void WalkNode(const char *path, struct dirent *node, CallBack cb) {
 	NodeCounter++; // Increment node count
 
 	// If node is NULL, populate node
-	if (node == NULL) {
+	// If node is DT_UNKNOWN - re-populate (wierd bug that is cured by calling lstat(2))
+	if (node == NULL || node->d_type == DT_UNKNOWN) {
 		if ((node = createNode(path)) == NULL) {
 			perror("node");
 			return;
@@ -132,6 +140,7 @@ static struct dirent *createNode(const char *path) {
 
 		// Get stats
 		if (lstat(path, &buf) == -1) {
+            fprintf(stderr, "Failed to lstat '%s'\n", path);
 			perror("lstat");
 			return NULL;
 		}
@@ -208,3 +217,6 @@ void printNode(const char *path, struct dirent *de) {
 }
 
 #endif /* XXX_MAIN_ENABLED_XXX */
+/*
+ * vim: :ts=4:sw=4:noexpandtab:nohls:ai:
+ */

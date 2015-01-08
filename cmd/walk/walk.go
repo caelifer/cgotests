@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"unsafe"
 )
 
@@ -99,12 +100,13 @@ func walkDir(path string, node Node, fn CustomFn) error {
 	defer C.closedir(dir)
 
 	for result = &de; C.readdir_r((*C.DIR)(dir), &de, &result) == 0 && result != nil; {
-		node := castDirentToNode(&de)
 
-		if dirDots(node) {
+		if dotDirs(getNameFromDirent(&de)) {
 			// skip '.' and '..'
 			continue
 		}
+
+		node := castDirentToNode(path, &de)
 
 		// Walk the node
 		newPath := path + "/" + node.Name()
@@ -121,8 +123,7 @@ func walkDir(path string, node Node, fn CustomFn) error {
 	panic("should never reach here")
 }
 
-func dirDots(node Node) bool {
-	name := node.Name()
+func dotDirs(name string) bool {
 	return name == "." || name == ".."
 }
 
@@ -131,28 +132,25 @@ func createNode(path string) (Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return castFileInfoToNode(fi), nil
+	// log.Printf("Created node for %#v\n", fi)
+	return makeNodeFromFileInfo(fi), nil
 }
 
-func castFileInfoToNode(fi os.FileInfo) Node {
+func makeNodeFromFileInfo(fi os.FileInfo) Node {
 	node := &node_t{}
 
 	node.name = fi.Name()
 	node.kind = castFileModeToNodeType(fi.Mode())
 
+	// log.Printf("[makeNodeFromFileInfo] %s - %s\n", node.Name(), node.Type())
+
 	return node
 }
 
 func castFileModeToNodeType(fm os.FileMode) NodeType {
-	if fm.IsRegular() {
-		return NTRegular
-	}
-
-	if fm.IsDir() {
+	switch fm & os.ModeType {
+	case os.ModeDir:
 		return NTDirectory
-	}
-
-	switch fm {
 	case os.ModeDevice:
 		return NTBlockDevice
 	case os.ModeCharDevice:
@@ -165,32 +163,49 @@ func castFileModeToNodeType(fm os.FileMode) NodeType {
 		return NTFIFO
 	}
 
+	if fm.IsRegular() {
+		return NTRegular
+	}
+
 	return NTUnknown
 }
 
-func castDirentToNode(dirent *C.struct_dirent) Node {
+func getNameFromDirent(dirent *C.struct_dirent) string {
+	return C.GoString((*C.char)(&dirent.d_name[0]))
+}
+
+func castDirentToNode(path string, dirent *C.struct_dirent) Node {
 	node := &node_t{}
 
-	node.name = C.GoString((*C.char)(&dirent.d_name[0]))
+	node.name = getNameFromDirent(dirent)
 
 	switch C.uchar(dirent.d_type) {
-	case C.DT_BLK:
-		node.kind = NTBlockDevice
+	case C.DT_FIFO:
+		node.kind = NTFIFO
 	case C.DT_CHR:
 		node.kind = NTCharDevice
 	case C.DT_DIR:
 		node.kind = NTDirectory
-	case C.DT_FIFO:
-		node.kind = NTFIFO
-	case C.DT_LNK:
-		node.kind = NTSymLink
+	case C.DT_BLK:
+		node.kind = NTBlockDevice
 	case C.DT_REG:
 		node.kind = NTRegular
+	case C.DT_LNK:
+		node.kind = NTSymLink
 	case C.DT_SOCK:
 		node.kind = NTSocket
+	case C.DT_WHT:
+		node.kind = NTWhiteout
 	default:
-		node.kind = NTUnknown
+		// Try our backup way
+		fi, err := os.Lstat(filepath.Join(path, node.Name()))
+		if err == nil {
+			node.kind = castFileModeToNodeType(fi.Mode())
+		} else {
+			node.kind = NTUnknown
+		}
 	}
+	// 	log.Printf("XXX [%s] - %#v (%s)\n", node.Name(), C.uchar(dirent.d_type), node.Type())
 
 	return node
 }
@@ -205,6 +220,7 @@ const (
 	NTSymLink                     // 	DT_LNK      This is a symbolic link.
 	NTRegular                     // 	DT_REG      This is a regular file.
 	NTSocket                      // 	DT_SOCK     This is a UNIX domain socket.
+	NTWhiteout                    // 	DT_WHT      This is BSD-style whiteout
 	NTUnknown                     // 	DT_UNKNOWN  The file type is unknown.
 )
 
@@ -224,6 +240,8 @@ func (nt NodeType) String() string {
 		return "REG"
 	case NTSocket:
 		return "SCK"
+	case NTWhiteout:
+		return "WHT"
 	default:
 		return "UKN"
 	}
@@ -252,3 +270,5 @@ func printNode(path string, node Node) error {
 	fmt.Printf("[%s] %s\n", node.Type(), path)
 	return nil
 }
+
+// vim: :ts=4:sw=4:noexpandtab:nohls:ai:

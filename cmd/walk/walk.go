@@ -3,23 +3,25 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"unsafe"
 )
-
 
 /*
 #include <dirent.h>
 #include <stdlib.h>
-
 #include "walk.h"
-
-extern int NodeCounter;
-extern int DirCounter;
-
-// Forward declaration (defined in cfuncs.go)
-extern void myPrint(char *p, struct dirent *de);
 */
 import "C"
+
+type CustomFn func(path string, node Node) error
+
+var progName string
+
+func init() {
+	// Get program name
+	progName = path.Base(os.Args[0])
+}
 
 func main() {
 	paths := os.Args[1:]
@@ -28,23 +30,145 @@ func main() {
 		paths = []string{"."}
 	}
 
-	Walk(paths, nil)
+	Walk(paths, nil, printNode)
 	// Print stats
 	fmt.Fprintf(os.Stderr, "\nTotal: %d nodes, %d directories, %d otheres\n",
 		int(C.NodeCounter), int(C.DirCounter), int(C.NodeCounter)-int(C.DirCounter),
 	)
 }
 
-func Walk(paths []string, node Node) {
+func Walk(paths []string, node Node, fn CustomFn) {
 	for _, p := range paths {
-		cpath := C.CString(p)
-		defer C.free(unsafe.Pointer(cpath))
-
-		C.WalkNode(cpath, nil, (C.CallBack)(unsafe.Pointer(C.myPrint)))
+		if err := walkNode(p, node, fn); err != nil {
+			warning(err.Error())
+		}
 	}
 }
 
-func makeNode(dirent *C.struct_dirent) Node {
+func warning(msg string) {
+	fmt.Fprintf(os.Stderr, "%s: %s\n", progName, msg)
+}
+
+func walkNode(path string, node Node, fn CustomFn) error {
+	var err error
+
+	// increment node counter
+	C.NodeCounter++
+
+	// Construct new node from path if not provided
+	if node == nil {
+		if node, err = createNode(path); err != nil {
+			// Report an error if we can't create a node from the path
+			return err
+		}
+	}
+
+	// Increment directory count if node is a directory
+	if node.Type() == NTDirectory {
+		C.DirCounter++
+	}
+
+	// Call CustomFn
+	if err = fn(path, node); err != nil {
+		return err
+	}
+
+	// Recursevly process directory
+	if node.Type() == NTDirectory {
+		err = walkDir(path, node, fn)
+	}
+
+	return err
+}
+
+func walkDir(path string, node Node, fn CustomFn) error {
+	var (
+		err    error
+		de     C.struct_dirent
+		result *C.struct_dirent
+	)
+
+	// Convert path to C-string
+	cpath := C.CString(path)
+	defer C.free(unsafe.Pointer(cpath))
+
+	dir, err := C.opendir(cpath)
+	if err != nil {
+		return err
+	}
+	defer C.closedir(dir)
+
+	for result = &de; C.readdir_r((*C.DIR)(dir), &de, &result) == 0 && result != nil; {
+		node := castDirentToNode(&de)
+
+		if dirDots(node) {
+			// skip '.' and '..'
+			continue
+		}
+
+		// Walk the node
+		newPath := path + "/" + node.Name()
+		if err = walkNode(newPath, node, fn); err != nil {
+			warning(newPath + ": " + err.Error())
+		}
+	}
+
+	if result == nil {
+		// EOF
+		return nil
+	}
+
+	panic("should never reach here")
+}
+
+func dirDots(node Node) bool {
+	name := node.Name()
+	return name == "." || name == ".."
+}
+
+func createNode(path string) (Node, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	return castFileInfoToNode(fi), nil
+}
+
+func castFileInfoToNode(fi os.FileInfo) Node {
+	node := &node_t{}
+
+	node.name = fi.Name()
+	node.kind = castFileModeToNodeType(fi.Mode())
+
+	return node
+}
+
+func castFileModeToNodeType(fm os.FileMode) NodeType {
+	if fm.IsRegular() {
+		return NTRegular
+	}
+
+	if fm.IsDir() {
+		return NTDirectory
+	}
+
+	switch fm {
+	case os.ModeDevice:
+		return NTBlockDevice
+	case os.ModeCharDevice:
+		return NTCharDevice
+	case os.ModeSymlink:
+		return NTSymLink
+	case os.ModeSocket:
+		return NTSocket
+	case os.ModeNamedPipe:
+		return NTFIFO
+	}
+
+	return NTUnknown
+}
+
+func castDirentToNode(dirent *C.struct_dirent) Node {
 	node := &node_t{}
 
 	node.name = C.GoString((*C.char)(&dirent.d_name[0]))
@@ -124,9 +248,7 @@ func (n node_t) Type() NodeType {
 }
 
 //export printNode
-func printNode(p *C.char, de *C.struct_dirent) {
-	path := C.GoString(p)
-	node := makeNode(de)
+func printNode(path string, node Node) error {
 	fmt.Printf("[%s] %s\n", node.Type(), path)
+	return nil
 }
-

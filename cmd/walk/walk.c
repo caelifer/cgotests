@@ -15,11 +15,15 @@
 #define NAME_MAX 1024
 #endif
 
-static struct dirent *createNode(const char *path);
-static int dots(const char *name);
-
 int NodeCounter = 0;
 int DirCounter = 0;
+
+// Disable main compiliation when building as a library
+#ifdef XXX_MAIN_ENABLED_XXX
+
+// Forward declaration
+static struct dirent *createNode(const char *path);
+static int dots(const char *name);
 
 /*
 * Implementation
@@ -161,8 +165,6 @@ static struct dirent *createNode(const char *path) {
 		return node;
 }
 
-// Disable main compiliation when building as a library
-#ifdef XXX_MAIN_ENABLED_XXX
 void printNode(const char *p, struct dirent *de);
 
 int main(int argc, char *argv[]) {

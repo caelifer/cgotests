@@ -146,12 +146,10 @@ func createNode(path string) (Node, error) {
 }
 
 func makeNodeFromFileInfo(fi os.FileInfo) Node {
-	node := &node_t{}
-
-	node.name = fi.Name()
-	node.kind = castFileModeToNodeType(fi.Mode())
-
-	return node
+	return &node_t{
+		name: fi.Name(),
+		kind: castFileModeToNodeType(fi.Mode()),
+	}
 }
 
 func castFileModeToNodeType(fm os.FileMode) NodeType {
@@ -182,9 +180,9 @@ func getNameFromDirent(dirent *C.struct_dirent) string {
 }
 
 func createNodeFromDirent(path string, dirent *C.struct_dirent) Node {
-	node := &node_t{}
-
-	node.name = getNameFromDirent(dirent)
+	node := &node_t{
+		name: getNameFromDirent(dirent),
+	}
 
 	switch C.uchar(dirent.d_type) {
 	case C.DT_FIFO:

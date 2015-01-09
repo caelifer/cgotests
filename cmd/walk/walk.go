@@ -5,19 +5,22 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync/atomic"
 	"unsafe"
 )
 
 /*
 #include <dirent.h>
 #include <stdlib.h>
-#include "walk.h"
 */
 import "C"
 
 type CustomFn func(path string, node Node) error
 
-var progName string
+var (
+	progName                string // Progname
+	NodeCounter, DirCounter uint64 // Counters
+)
 
 func init() {
 	// Get program name
@@ -34,7 +37,7 @@ func main() {
 	Walk(paths, nil, printNode)
 	// Print stats
 	fmt.Fprintf(os.Stderr, "\nTotal: %d nodes, %d directories, %d otheres\n",
-		int(C.NodeCounter), int(C.DirCounter), int(C.NodeCounter)-int(C.DirCounter),
+		NodeCounter, DirCounter, NodeCounter-DirCounter,
 	)
 }
 
@@ -54,7 +57,7 @@ func walkNode(path string, node Node, fn CustomFn) error {
 	var err error
 
 	// increment node counter
-	C.NodeCounter++
+	atomic.AddUint64(&NodeCounter, 1)
 
 	// Construct new node from path if not provided
 	if node == nil {
@@ -66,7 +69,7 @@ func walkNode(path string, node Node, fn CustomFn) error {
 
 	// Increment directory count if node is a directory
 	if node.Type() == NTDirectory {
-		C.DirCounter++
+		atomic.AddUint64(&DirCounter, 1)
 	}
 
 	// Call CustomFn

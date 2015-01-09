@@ -202,7 +202,7 @@ func castDirentToNode(path string, dirent *C.struct_dirent) Node {
 	case C.DT_WHT:
 		node.kind = NTWhiteout
 	default:
-		// Try our backup way
+		// Try using lstat(2) [fixing readdir_r(2) bug]
 		fi, err := os.Lstat(filepath.Join(path, node.Name()))
 		if err == nil {
 			node.kind = castFileModeToNodeType(fi.Mode())
@@ -210,8 +210,6 @@ func castDirentToNode(path string, dirent *C.struct_dirent) Node {
 			node.kind = NTUnknown
 		}
 	}
-	// 	log.Printf("XXX [%s] - %#v (%s)\n", node.Name(), C.uchar(dirent.d_type), node.Type())
-
 	return node
 }
 
@@ -270,7 +268,7 @@ func (n node_t) Type() NodeType {
 	return n.kind
 }
 
-//export printNode
+// our custom callback function
 func printNode(path string, node Node) error {
 	fmt.Printf("[%s] %s\n", node.Type(), path)
 	return nil

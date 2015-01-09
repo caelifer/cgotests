@@ -97,31 +97,27 @@ func walkDir(path string, node Node, fn CustomFn) error {
 	if err != nil {
 		return err
 	}
-	defer C.closedir(dir)
 
+	nodes := make([]Node, 0, 1024)
 	for result = &de; C.readdir_r((*C.DIR)(dir), &de, &result) == 0 && result != nil; {
-
 		if dotDirs(getNameFromDirent(&de)) {
 			// skip '.' and '..'
 			continue
 		}
-
-		node := castDirentToNode(path, &de)
-
-		// Build new path
-		newPath := path
-		if newPath != "/" {
-			newPath += "/"
-		}
-		newPath += node.Name()
-
-		// Walk the node
-		if err = walkNode(newPath, node, fn); err != nil {
-			warning(newPath, err)
-		}
+		nodes = append(nodes, castDirentToNode(path, &de))
 	}
+	// Close directory ASAP
+	C.closedir(dir)
 
 	if result == nil {
+		for _, node := range nodes {
+			newPath := filepath.Join(path, node.Name())
+			// Walk each node
+			if err = walkNode(newPath, node, fn); err != nil {
+				warning(newPath, err)
+			}
+		}
+
 		// EOF
 		return nil
 	}

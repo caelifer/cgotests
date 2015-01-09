@@ -41,13 +41,13 @@ func main() {
 func Walk(paths []string, node Node, fn CustomFn) {
 	for _, p := range paths {
 		if err := walkNode(p, node, fn); err != nil {
-			warning(err.Error())
+			warning(p, err)
 		}
 	}
 }
 
-func warning(msg string) {
-	fmt.Fprintf(os.Stderr, "%s: %s\n", progName, msg)
+func warning(path string, err error) {
+	fmt.Fprintf(os.Stderr, "%s: %q: %s\n", progName, path, err)
 }
 
 func walkNode(path string, node Node, fn CustomFn) error {
@@ -108,10 +108,16 @@ func walkDir(path string, node Node, fn CustomFn) error {
 
 		node := castDirentToNode(path, &de)
 
+		// Build new path
+		newPath := path
+		if newPath != "/" {
+			newPath += "/"
+		}
+		newPath += node.Name()
+
 		// Walk the node
-		newPath := path + "/" + node.Name()
 		if err = walkNode(newPath, node, fn); err != nil {
-			warning(newPath + ": " + err.Error())
+			warning(newPath, err)
 		}
 	}
 

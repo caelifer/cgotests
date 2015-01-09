@@ -34,7 +34,12 @@ func main() {
 		paths = []string{"."}
 	}
 
-	Walk(paths, nil, printNode)
+	// Walk provided path with the custom function
+	Walk(paths, nil, func(path string, node Node) error {
+		fmt.Printf("[%s] %s\n", node.Type(), path)
+		return nil
+	})
+
 	// Print stats
 	fmt.Fprintf(os.Stderr, "\nTotal: %d nodes, %d directories, %d otheres\n",
 		NodeCounter, DirCounter, NodeCounter-DirCounter,
@@ -101,17 +106,19 @@ func walkDir(path string, node Node, fn CustomFn) error {
 		return err
 	}
 
+	// Node accumulator
 	nodes := make([]Node, 0, 1024)
 	for result = &de; C.readdir_r((*C.DIR)(dir), &de, &result) == 0 && result != nil; {
 		if dotDirs(getNameFromDirent(&de)) {
 			// skip '.' and '..'
 			continue
 		}
-		nodes = append(nodes, castDirentToNode(path, &de))
+		nodes = append(nodes, createNodeFromDirent(path, &de))
 	}
 	// Close directory ASAP
 	C.closedir(dir)
 
+	// Process all accumulated nodes if no errors were detected
 	if result == nil {
 		for _, node := range nodes {
 			newPath := filepath.Join(path, node.Name())
@@ -120,8 +127,6 @@ func walkDir(path string, node Node, fn CustomFn) error {
 				warning(newPath, err)
 			}
 		}
-
-		// EOF
 		return nil
 	}
 
@@ -137,7 +142,6 @@ func createNode(path string) (Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	// log.Printf("Created node for %#v\n", fi)
 	return makeNodeFromFileInfo(fi), nil
 }
 
@@ -146,8 +150,6 @@ func makeNodeFromFileInfo(fi os.FileInfo) Node {
 
 	node.name = fi.Name()
 	node.kind = castFileModeToNodeType(fi.Mode())
-
-	// log.Printf("[makeNodeFromFileInfo] %s - %s\n", node.Name(), node.Type())
 
 	return node
 }
@@ -179,7 +181,7 @@ func getNameFromDirent(dirent *C.struct_dirent) string {
 	return C.GoString((*C.char)(&dirent.d_name[0]))
 }
 
-func castDirentToNode(path string, dirent *C.struct_dirent) Node {
+func createNodeFromDirent(path string, dirent *C.struct_dirent) Node {
 	node := &node_t{}
 
 	node.name = getNameFromDirent(dirent)
@@ -216,15 +218,15 @@ func castDirentToNode(path string, dirent *C.struct_dirent) Node {
 type NodeType uint8
 
 const (
-	NTBlockDevice NodeType = iota // 	DT_BLK      This is a block device.
-	NTCharDevice                  // 	DT_CHR      This is a character device.
-	NTDirectory                   // 	DT_DIR      This is a directory.
-	NTFIFO                        // 	DT_FIFO     This is a named pipe (FIFO).
-	NTSymLink                     // 	DT_LNK      This is a symbolic link.
-	NTRegular                     // 	DT_REG      This is a regular file.
-	NTSocket                      // 	DT_SOCK     This is a UNIX domain socket.
-	NTWhiteout                    // 	DT_WHT      This is BSD-style whiteout
-	NTUnknown                     // 	DT_UNKNOWN  The file type is unknown.
+	NTBlockDevice NodeType = iota // DT_BLK      This is a block device.
+	NTCharDevice                  // DT_CHR      This is a character device.
+	NTDirectory                   // DT_DIR      This is a directory.
+	NTFIFO                        // DT_FIFO     This is a named pipe (FIFO).
+	NTSymLink                     // DT_LNK      This is a symbolic link.
+	NTRegular                     // DT_REG      This is a regular file.
+	NTSocket                      // DT_SOCK     This is a UNIX domain socket.
+	NTWhiteout                    // DT_WHT      This is BSD-style whiteout
+	NTUnknown                     // DT_UNKNOWN  The file type is unknown.
 )
 
 func (nt NodeType) String() string {
@@ -255,6 +257,7 @@ type Node interface {
 	Type() NodeType // Node's type
 }
 
+// Concreate implementation of Node interface
 type node_t struct {
 	name string
 	kind NodeType
@@ -266,12 +269,6 @@ func (n node_t) Name() string {
 
 func (n node_t) Type() NodeType {
 	return n.kind
-}
-
-// our custom callback function
-func printNode(path string, node Node) error {
-	fmt.Printf("[%s] %s\n", node.Type(), path)
-	return nil
 }
 
 // vim: :ts=4:sw=4:noexpandtab:nohls:ai:

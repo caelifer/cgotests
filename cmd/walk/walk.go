@@ -18,13 +18,13 @@ import "C"
 type CustomFn func(path string, node Node) error
 
 var (
-	progName                string // Progname
+	ProgName                string // Progname
 	NodeCounter, DirCounter uint64 // Counters
 )
 
 func init() {
 	// Get program name
-	progName = path.Base(os.Args[0])
+	ProgName = path.Base(os.Args[0])
 }
 
 func main() {
@@ -55,7 +55,7 @@ func Walk(paths []string, node Node, fn CustomFn) {
 }
 
 func warning(path string, err error) {
-	fmt.Fprintf(os.Stderr, "%s: %q: %s\n", progName, path, err)
+	fmt.Fprintf(os.Stderr, "%s: %q: %s\n", ProgName, path, err)
 }
 
 func walkNode(path string, node Node, fn CustomFn) error {

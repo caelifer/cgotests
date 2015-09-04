@@ -140,7 +140,7 @@ static struct dirent *createNode(const char *path) {
 
 		// Get stats
 		if (lstat(path, &buf) == -1) {
-            fprintf(stderr, "Failed to lstat '%s'\n", path);
+			fprintf(stderr, "Failed to lstat '%s'\n", path);
 			perror("lstat");
 			return NULL;
 		}
